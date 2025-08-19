@@ -129,19 +129,13 @@
         #formContainer.readonly #apiUrlInput:hover {
             background-color: var(--light-pink);
         }
-        /* --- 新增：复制中的状态，鼠标样式变为默认，防止重复点击 --- */
-        #formContainer.readonly input.copying {
-             cursor: default;
-             background-color: var(--light-pink); /* 保持高亮状态 */
-        }
-
 
         #formContainer.readonly .delete-key-btn, #formContainer.readonly #addKeyBtn { display: none; }
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: bold; color: var(--main-pink); }
         input[type="text"] {
             width: 100%; padding: 12px; border: 2px solid var(--border-color);
-            border-radius: 10px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s, background-color 0.3s;
+            border-radius: 10px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s, background-color 0.3s, color 0.2s;
         }
         input[type="text"]:focus { outline: none; border-color: var(--main-pink); }
         .key-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -163,6 +157,8 @@
             transform: scale(1.1);
         }
 
+
+        /* --- 右下角浮动添加按钮 --- */
         #addApiBtn {
             position: fixed; bottom: 30px; right: 30px;
             width: 60px; height: 60px; border-radius: 50%; z-index: 1000;
@@ -195,14 +191,16 @@
             </div>
             <div id="formContainer">
                 <input type="hidden" id="apiIdInput">
+                
                 <div class="form-group">
                     <label>头像</label>
                     <img id="apiImagePreview" src="" alt="API Avatar Preview">
                     <input type="file" id="apiImageInput" accept="image/*" style="display: none;">
                 </div>
+
                 <div class="form-group">
                     <label for="apiUrlInput">反代地址 (URL)</label>
-                    <input type="text" id="apiUrlInput" placeholder="忘了v1就咬你喵！">
+                    <input type="text" id="apiUrlInput" placeholder="忘记v1就咬你喵！">
                 </div>
                 <div class="form-group">
                     <label>密钥 (Keys)</label>
@@ -252,8 +250,17 @@
             };
             
             // --- 页面切换 ---
-            const showMainPage = () => { mainPage.style.display = 'block'; detailPage.style.display = 'none'; addApiBtn.style.display = 'block'; renderApiList(); };
-            const showDetailPage = () => { mainPage.style.display = 'none'; detailPage.style.display = 'block'; addApiBtn.style.display = 'none'; };
+            const showMainPage = () => {
+                mainPage.style.display = 'block';
+                detailPage.style.display = 'none';
+                addApiBtn.style.display = 'block';
+                renderApiList();
+            };
+            const showDetailPage = () => {
+                mainPage.style.display = 'none';
+                detailPage.style.display = 'block';
+                addApiBtn.style.display = 'none';
+            };
             
             // --- 渲染API列表 ---
             const renderApiList = () => {
@@ -267,19 +274,31 @@
                         apiList.innerHTML = '<p style="text-align:center; color:#aaa;">列表为空，请点击右下角按钮添加新的 API 配置。</p>';
                     } else {
                         apis.forEach(api => {
-                            const card = document.createElement('div'); card.className = 'api-card'; card.dataset.id = api.id;
-                            const avatar = document.createElement('img'); avatar.className = 'api-card-avatar'; avatar.src = api.imageDataUrl || DEFAULT_AVATAR;
-                            const nameSpan = document.createElement('span'); nameSpan.textContent = api.name;
+                            const card = document.createElement('div');
+                            card.className = 'api-card'; card.dataset.id = api.id;
+                            const avatar = document.createElement('img');
+                            avatar.className = 'api-card-avatar';
+                            avatar.src = api.imageDataUrl || DEFAULT_AVATAR;
+                            const nameSpan = document.createElement('span');
+                            nameSpan.textContent = api.name;
                             card.append(avatar, nameSpan);
                             let pressTimer = null, isLongPress = false;
                             const startPress = (event) => {
                                 if (event.type === 'mousedown' && event.button !== 0) return;
                                 isLongPress = false;
-                                pressTimer = setTimeout(() => { isLongPress = true; if (confirm(`确定要删除 "${api.name}" 吗？`)) deleteApi(api.id); }, 700);
+                                pressTimer = setTimeout(() => {
+                                    isLongPress = true;
+                                    if (confirm(`确定要删除 "${api.name}" 吗？`)) deleteApi(api.id);
+                                }, 700);
                             };
                             const cancelPress = () => clearTimeout(pressTimer);
                             card.addEventListener('click', (event) => {
-                                if (isLongPress) { event.preventDefault(); event.stopPropagation(); } else { loadApiDetails(api.id); }
+                                if (isLongPress) {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                } else {
+                                    loadApiDetails(api.id);
+                                }
                             });
                             card.addEventListener('mousedown', startPress);
                             card.addEventListener('touchstart', startPress, { passive: true });
@@ -299,7 +318,8 @@
                 db.transaction(storeName, 'readonly').objectStore(storeName).get(id).onsuccess = (e) => {
                     const api = e.target.result;
                     if (api) {
-                        apiIdInput.value = api.id; detailApiName.textContent = api.name;
+                        apiIdInput.value = api.id;
+                        detailApiName.textContent = api.name;
                         apiImagePreview.src = api.imageDataUrl || DEFAULT_AVATAR;
                         apiUrlInput.value = api.url || '';
                         renderKeyList(api.keys || []);
@@ -309,41 +329,55 @@
                 };
             };
 
-            const renderKeyList = (keys) => { keyList.innerHTML = ''; if (keys.length === 0) keys.push(''); keys.forEach(key => addKeyInput(key)); };
+            const renderKeyList = (keys) => {
+                keyList.innerHTML = '';
+                if (keys.length === 0) keys.push('');
+                keys.forEach(key => addKeyInput(key));
+            };
 
-            // --- 修改：封装可复用的、带状态锁的复制函数 ---
+            // --- 修改：增加“锁”来防止重复复制 ---
             const copyOnClick = (inputElement) => {
-                // 如果当前正在显示“已复制”提示，则直接返回，不执行任何操作
-                if (inputElement.classList.contains('copying')) {
+                // 如果元素正处于“复制中”的状态，则直接返回
+                if (inputElement.dataset.isCopying) {
                     return;
                 }
-                // 仅在只读模式且输入框有内容时触发
+                
                 if (formContainer.classList.contains('readonly') && inputElement.value.trim() !== '') {
+                    // 上锁
+                    inputElement.dataset.isCopying = 'true';
+
                     const originalValue = inputElement.value;
                     const originalColor = inputElement.style.color;
+
                     navigator.clipboard.writeText(originalValue).then(() => {
                         inputElement.value = '已复制!';
                         inputElement.style.color = 'var(--main-pink)';
-                        inputElement.classList.add('copying'); // 添加状态类，表示正在复制中
-
                         setTimeout(() => {
                             inputElement.value = originalValue;
                             inputElement.style.color = originalColor;
-                            inputElement.classList.remove('copying'); // 移除状态类，恢复可复制状态
+                            // 延时后解锁
+                            delete inputElement.dataset.isCopying;
                         }, 1500);
                     }).catch(err => {
                         console.error('复制失败:', err);
                         alert('复制失败，请检查浏览器设置或权限。');
+                        // 如果复制失败也要解锁
+                        delete inputElement.dataset.isCopying;
                     });
                 }
             };
             
             const addKeyInput = (value = '') => {
-                const keyItem = document.createElement('div'); keyItem.className = 'key-item';
-                const input = document.createElement('input'); input.type = 'text'; input.value = value; input.placeholder = '填写密钥喵~;
-                const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-key-btn'; deleteBtn.innerHTML = '&times;';
+                const keyItem = document.createElement('div');
+                keyItem.className = 'key-item';
+                const input = document.createElement('input');
+                input.type = 'text'; input.value = value; input.placeholder = '填写密钥喵～';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-key-btn'; deleteBtn.innerHTML = '&times;';
                 deleteBtn.onclick = () => { if (keyList.children.length > 1) keyItem.remove(); };
+                
                 input.addEventListener('click', () => copyOnClick(input));
+
                 keyItem.append(input, deleteBtn);
                 keyList.appendChild(keyItem);
             };
@@ -363,30 +397,52 @@
                 const id = parseInt(apiIdInput.value);
                 const imageDataUrl = apiImagePreview.src.startsWith('data:image') ? apiImagePreview.src : null;
                 const url = apiUrlInput.value.trim();
-                const keys = Array.from(keyList.querySelectorAll('.key-item input')).map(input => input.value.trim()).filter(key => key);
+                const keys = Array.from(keyList.querySelectorAll('input')).map(input => input.value.trim()).filter(key => key);
                 
                 const transaction = db.transaction(storeName, 'readwrite');
                 const objectStore = transaction.objectStore(storeName);
                 objectStore.get(id).onsuccess = (e) => {
                     const apiData = e.target.result;
-                    apiData.imageDataUrl = imageDataUrl; apiData.url = url;
+                    apiData.imageDataUrl = imageDataUrl;
+                    apiData.url = url;
                     apiData.keys = keys.length > 0 ? keys : [''];
-                    objectStore.put(apiData).onsuccess = () => { setReadonlyState(true); alert('保存成功'); renderApiList(); };
+                    
+                    objectStore.put(apiData).onsuccess = () => {
+                        setReadonlyState(true);
+                        alert('保存成功');
+                        renderApiList(); 
+                    };
                 };
             };
-            const deleteApi = (id) => { db.transaction(storeName, 'readwrite').objectStore(storeName).delete(id).onsuccess = () => renderApiList(); };
+            const deleteApi = (id) => {
+                db.transaction(storeName, 'readwrite').objectStore(storeName).delete(id).onsuccess = () => renderApiList();
+            };
 
             // --- 事件监听 ---
-            addApiBtn.addEventListener('click', () => { const apiName = prompt('请输入新的 API 名称：'); if (apiName && apiName.trim()) addApi(apiName.trim()); });
+            addApiBtn.addEventListener('click', () => {
+                const apiName = prompt('请输入新的 API 名称：');
+                if (apiName && apiName.trim()) addApi(apiName.trim());
+            });
             backBtn.addEventListener('click', showMainPage);
             editBtn.addEventListener('click', () => setReadonlyState(false));
             saveBtn.addEventListener('click', updateApi);
             addKeyBtn.addEventListener('click', () => addKeyInput());
+            
             apiUrlInput.addEventListener('click', () => copyOnClick(apiUrlInput));
-            apiImagePreview.addEventListener('click', () => { if (!formContainer.classList.contains('readonly')) { apiImageInput.click(); } });
+
+            apiImagePreview.addEventListener('click', () => {
+                if (!formContainer.classList.contains('readonly')) {
+                    apiImageInput.click();
+                }
+            });
+
             apiImageInput.addEventListener('change', (event) => {
                 const file = event.target.files[0];
-                if (file) { const reader = new FileReader(); reader.onload = (e) => apiImagePreview.src = e.target.result; reader.readAsDataURL(file); }
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => apiImagePreview.src = e.target.result;
+                    reader.readAsDataURL(file);
+                }
             });
         });
     </script>
