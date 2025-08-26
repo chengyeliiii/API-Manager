@@ -117,7 +117,13 @@
             border-color: var(--main-pink);
         }
 
-        #formContainer.readonly input { background-color: #f9f9f9; pointer-events: none; border-color: #eee; }
+        /* --- 只读模式 --- */
+        #formContainer.readonly input:not([type="radio"]):not(.calculator-input),
+        #formContainer.readonly textarea { 
+            background-color: #f9f9f9; 
+            pointer-events: none; 
+            border-color: #eee; 
+        }
         
         #formContainer.readonly .key-item input,
         #formContainer.readonly #apiUrlInput {
@@ -130,18 +136,36 @@
             background-color: var(--light-pink);
         }
 
-        #formContainer.readonly .delete-key-btn, #formContainer.readonly #addKeyBtn { display: none; }
+        #formContainer.readonly .delete-key-btn, 
+        #formContainer.readonly #addKeyBtn,
+        #formContainer.readonly .delete-model-btn,
+        #formContainer.readonly #addModelBtn,
+        #formContainer.readonly input[type="radio"] { 
+            display: none; 
+        }
+        
+        #formContainer.readonly .pricing-type-group input[type="radio"] + label {
+            pointer-events: none;
+        }
+        #formContainer.readonly .pricing-type-group input[type="radio"]:not(:checked) + label {
+            display: none;
+        }
+       
+        /* --- 表单通用样式 --- */
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: bold; color: var(--main-pink); }
-        input[type="text"] {
+        input[type="text"], textarea {
             width: 100%; padding: 12px; border: 2px solid var(--border-color);
             border-radius: 10px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s, background-color 0.3s, color 0.2s;
         }
-        input[type="text"]:focus { outline: none; border-color: var(--main-pink); }
-        .key-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .key-item input { flex-grow: 1; }
+        input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--main-pink); }
+        textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+        
+        /* --- 密钥 & 模型列表 --- */
+        .key-item, .model-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .key-item input, .model-item input { flex-grow: 1; }
 
-        .delete-key-btn {
+        .delete-key-btn, .delete-model-btn {
             background: none;
             border: 1px solid var(--light-pink);
             color: var(--main-pink);
@@ -151,12 +175,33 @@
             border-radius: 8px;
             line-height: 1.4;
             transition: background-color 0.2s, transform 0.2s;
+            flex-shrink: 0;
         }
-        .delete-key-btn:hover {
+        .delete-key-btn:hover, .delete-model-btn:hover {
             background-color: var(--bg-color);
             transform: scale(1.1);
         }
 
+        /* --- 新增：计费方式 --- */
+        .pricing-type-group { display: flex; gap: 20px; align-items: center; margin-bottom: 15px; }
+        .pricing-type-group input[type="radio"] { display: none; }
+        .pricing-type-group label {
+            cursor: pointer; padding: 8px 15px; border-radius: 10px; border: 2px solid var(--border-color);
+            transition: all 0.2s; margin-bottom: 0;
+        }
+        .pricing-type-group input[type="radio"]:checked + label {
+            background-color: var(--main-pink); color: white; border-color: var(--main-pink);
+        }
+        .pricing-detail-container {
+            background-color: #fff9fb; padding: 15px; border-radius: 10px; border: 1px dashed var(--border-color);
+        }
+        
+        /* --- 按量/按次计费 & 计算器 --- */
+        .by-amount-group, .calculator-group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+        .by-amount-group input, .calculator-group input { width: 100px; }
+        .by-amount-group span, .calculator-group span { color: var(--text-color); }
+        .calculator-group { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--light-pink); }
+        #totalCost, #timesCalcResult { font-weight: bold; color: var(--main-pink); }
 
         /* --- 右下角浮动添加按钮 --- */
         #addApiBtn {
@@ -207,6 +252,60 @@
                     <div id="keyList"></div>
                     <button id="addKeyBtn" style="margin-top: 10px;">+ 添加密钥</button>
                 </div>
+
+                <!-- ======== 功能区域开始 ======== -->
+                <div class="form-group">
+                    <label>计费方式</label>
+                    <div class="pricing-type-group">
+                        <input type="radio" id="priceByType" name="pricingType" value="times" checked>
+                        <label for="priceByType">按次</label>
+                        <input type="radio" id="priceByAmount" name="pricingType" value="amount">
+                        <label for="priceByAmount">按量</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>价格详情</label>
+                    <div class="pricing-detail-container">
+                        <!-- 按次 -->
+                        <div id="pricingTimesDetail">
+                            <div id="modelList"></div>
+                            <!-- 按次计算器 -->
+                            <div class="calculator-group">
+                                <input type="text" id="timesCalcInput1" class="calculator-input" placeholder="总额">
+                                <span>÷</span>
+                                <input type="text" id="timesCalcInput2" class="calculator-input" placeholder="单次">
+                                <span>=</span>
+                                <span id="timesCalcResult">...</span>
+                                <span>次</span>
+                            </div>
+                            <button id="addModelBtn" style="margin-top: 10px;">+ 添加模型</button>
+                        </div>
+                        <!-- 按量 -->
+                        <div id="pricingAmountDetail" style="display: none;">
+                            <div class="by-amount-group">
+                                <span>输入: $</span><input type="text" id="inputPrice" placeholder="e.g., 0.5"><span> / M tokens</span>
+                            </div>
+                            <div class="by-amount-group" style="margin-top: 10px;">
+                                <span>输出: $</span><input type="text" id="outputPrice" placeholder="e.g., 1.5"><span> / M tokens</span>
+                            </div>
+                            <!-- 按量计算器 -->
+                            <div class="calculator-group">
+                                <input type="text" id="inputTokens" class="calculator-input" placeholder="输入tokens">
+                                <span>+</span>
+                                <input type="text" id="outputTokens" class="calculator-input" placeholder="输出tokens">
+                                <span>= $</span>
+                                <span id="totalCost">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="descriptionInput">使用体验</label>
+                    <textarea id="descriptionInput" placeholder="在这里写下你的体验和备注喵～"></textarea>
+                </div>
+                <!-- ======== 功能区域结束 ======== -->
             </div>
         </div>
     </div>
@@ -215,7 +314,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- 元素获取 ---
+            // --- 元素获取 (主页和旧功能) ---
             const mainPage = document.getElementById('mainPage'),
                   detailPage = document.getElementById('detailPage'),
                   addApiBtn = document.getElementById('addApiBtn'),
@@ -232,6 +331,23 @@
                   editBtn = document.getElementById('editBtn'),
                   saveBtn = document.getElementById('saveBtn');
 
+            // --- 元素获取 (新功能) ---
+            const priceByTypeRadio = document.getElementById('priceByType'),
+                  priceByAmountRadio = document.getElementById('priceByAmount'),
+                  pricingTimesDetail = document.getElementById('pricingTimesDetail'),
+                  pricingAmountDetail = document.getElementById('pricingAmountDetail'),
+                  modelList = document.getElementById('modelList'),
+                  addModelBtn = document.getElementById('addModelBtn'),
+                  inputPriceInput = document.getElementById('inputPrice'),
+                  outputPriceInput = document.getElementById('outputPrice'),
+                  inputTokensInput = document.getElementById('inputTokens'),
+                  outputTokensInput = document.getElementById('outputTokens'),
+                  totalCostSpan = document.getElementById('totalCost'),
+                  descriptionInput = document.getElementById('descriptionInput'),
+                  timesCalcInput1 = document.getElementById('timesCalcInput1'),
+                  timesCalcInput2 = document.getElementById('timesCalcInput2'),
+                  timesCalcResult = document.getElementById('timesCalcResult');
+
             // --- 全局变量 ---
             const DEFAULT_AVATAR = 'https://i.postimg.cc/6QsJcRWL/1.jpg';
             let db;
@@ -239,7 +355,7 @@
             const storeName = 'apis';
             
             // --- IndexedDB 初始化 ---
-            const request = indexedDB.open(dbName, 1);
+            const request = indexedDB.open(dbName, 2); 
             request.onerror = (e) => console.error("数据库打开失败:", e.target.errorCode);
             request.onsuccess = (e) => { db = e.target.result; renderApiList(); };
             request.onupgradeneeded = (e) => {
@@ -265,9 +381,7 @@
             // --- 渲染API列表 ---
             const renderApiList = () => {
                 if (!db) return;
-                const transaction = db.transaction(storeName, 'readonly');
-                const objectStore = transaction.objectStore(storeName);
-                objectStore.getAll().onsuccess = (e) => {
+                db.transaction(storeName, 'readonly').objectStore(storeName).getAll().onsuccess = (e) => {
                     apiList.innerHTML = ''; 
                     const apis = e.target.result;
                     if (apis.length === 0) {
@@ -315,56 +429,61 @@
             
             // --- 加载API详情 ---
             const loadApiDetails = (id) => {
+                if (!db) return;
                 db.transaction(storeName, 'readonly').objectStore(storeName).get(id).onsuccess = (e) => {
                     const api = e.target.result;
                     if (api) {
+                        // 重置表单以清除旧数据
+                        keyList.innerHTML = '';
+                        modelList.innerHTML = '';
+                        descriptionInput.value = '';
+                        // 清空计算器
+                        inputPriceInput.value = ''; outputPriceInput.value = '';
+                        inputTokensInput.value = ''; outputTokensInput.value = '';
+                        timesCalcInput1.value = ''; timesCalcInput2.value = '';
+                        calculateCost(); calculateTimes();
+
+                        // 填充数据
                         apiIdInput.value = api.id;
                         detailApiName.textContent = api.name;
                         apiImagePreview.src = api.imageDataUrl || DEFAULT_AVATAR;
                         apiUrlInput.value = api.url || '';
                         renderKeyList(api.keys || []);
+                        
+                        descriptionInput.value = api.description || '';
+                        const pricingType = api.pricingType || 'times'; 
+                        
+                        if (pricingType === 'amount') {
+                            priceByAmountRadio.checked = true;
+                            const details = api.pricingDetails || {};
+                            inputPriceInput.value = details.input || '';
+                            outputPriceInput.value = details.output || '';
+                            renderModelList([]);
+                        } else {
+                            priceByTypeRadio.checked = true;
+                            const models = Array.isArray(api.pricingDetails) ? api.pricingDetails : [];
+                            renderModelList(models);
+                        }
+                        
+                        togglePricingDetails(); 
                         setReadonlyState(true); 
                         showDetailPage();
+                    } else {
+                        console.error('未找到ID为', id, '的API');
+                        alert('加载失败，找不到该条目。');
+                        showMainPage();
                     }
                 };
+                db.transaction(storeName, 'readonly').objectStore(storeName).get(id).onerror = (e) => {
+                     alert('加载数据时出错！');
+                     console.error("加载API详情失败: ", e.target.error);
+                }
             };
 
             const renderKeyList = (keys) => {
                 keyList.innerHTML = '';
                 if (keys.length === 0) keys.push('');
                 keys.forEach(key => addKeyInput(key));
-            };
-
-            // --- 修改：增加“锁”来防止重复复制 ---
-            const copyOnClick = (inputElement) => {
-                // 如果元素正处于“复制中”的状态，则直接返回
-                if (inputElement.dataset.isCopying) {
-                    return;
-                }
-                
-                if (formContainer.classList.contains('readonly') && inputElement.value.trim() !== '') {
-                    // 上锁
-                    inputElement.dataset.isCopying = 'true';
-
-                    const originalValue = inputElement.value;
-                    const originalColor = inputElement.style.color;
-
-                    navigator.clipboard.writeText(originalValue).then(() => {
-                        inputElement.value = '已复制!';
-                        inputElement.style.color = 'var(--main-pink)';
-                        setTimeout(() => {
-                            inputElement.value = originalValue;
-                            inputElement.style.color = originalColor;
-                            // 延时后解锁
-                            delete inputElement.dataset.isCopying;
-                        }, 1500);
-                    }).catch(err => {
-                        console.error('复制失败:', err);
-                        alert('复制失败，请检查浏览器设置或权限。');
-                        // 如果复制失败也要解锁
-                        delete inputElement.dataset.isCopying;
-                    });
-                }
             };
             
             const addKeyInput = (value = '') => {
@@ -375,39 +494,123 @@
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-key-btn'; deleteBtn.innerHTML = '&times;';
                 deleteBtn.onclick = () => { if (keyList.children.length > 1) keyItem.remove(); };
-                
                 input.addEventListener('click', () => copyOnClick(input));
-
                 keyItem.append(input, deleteBtn);
                 keyList.appendChild(keyItem);
+            };
+
+            const copyOnClick = (inputElement) => {
+                if (inputElement.dataset.isCopying) return;
+                if (formContainer.classList.contains('readonly') && inputElement.value.trim() !== '') {
+                    inputElement.dataset.isCopying = 'true';
+                    const originalValue = inputElement.value;
+                    const originalColor = inputElement.style.color;
+                    navigator.clipboard.writeText(originalValue).then(() => {
+                        inputElement.value = '已复制!';
+                        inputElement.style.color = 'var(--main-pink)';
+                        setTimeout(() => {
+                            inputElement.value = originalValue;
+                            inputElement.style.color = originalColor;
+                            delete inputElement.dataset.isCopying;
+                        }, 1500);
+                    }).catch(err => {
+                        console.error('复制失败:', err);
+                        alert('复制失败，请检查浏览器设置或权限。');
+                        delete inputElement.dataset.isCopying;
+                    });
+                }
+            };
+            
+            const renderModelList = (models) => {
+                modelList.innerHTML = '';
+                if (models.length === 0) models.push({ name: '', cost: '' });
+                models.forEach(model => addModelInput(model.name, model.cost));
+            };
+
+            const addModelInput = (name = '', cost = '') => {
+                const modelItem = document.createElement('div');
+                modelItem.className = 'model-item';
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text'; nameInput.value = name; nameInput.placeholder = '模型名称';
+                const costInput = document.createElement('input');
+                costInput.type = 'text'; costInput.value = cost; costInput.placeholder = '消耗(次/金额)';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-model-btn'; deleteBtn.innerHTML = '&times;';
+                deleteBtn.onclick = () => { if (modelList.children.length > 1) modelItem.remove(); };
+                modelItem.append(nameInput, costInput, deleteBtn);
+                modelList.appendChild(modelItem);
+            };
+            
+            // --- 计算功能 ---
+            const calculateCost = () => {
+                const M_TOKENS = 1000000;
+                const inPrice = parseFloat(inputPriceInput.value) || 0;
+                const outPrice = parseFloat(outputPriceInput.value) || 0;
+                const inTokens = parseFloat(inputTokensInput.value) || 0;
+                const outTokens = parseFloat(outputTokensInput.value) || 0;
+                const total = (inTokens / M_TOKENS * inPrice) + (outTokens / M_TOKENS * outPrice);
+                totalCostSpan.textContent = total.toFixed(6); 
+            };
+
+            const calculateTimes = () => {
+                const total = parseFloat(timesCalcInput1.value) || 0;
+                const per = parseFloat(timesCalcInput2.value) || 0;
+                if (per === 0) {
+                    timesCalcResult.textContent = '...';
+                    return;
+                }
+                const result = total / per;
+                // 如果是整数，显示整数，否则显示两位小数
+                timesCalcResult.textContent = result % 1 === 0 ? result : result.toFixed(2);
+            };
+
+            const togglePricingDetails = () => {
+                if (priceByAmountRadio.checked) {
+                    pricingTimesDetail.style.display = 'none';
+                    pricingAmountDetail.style.display = 'block';
+                } else {
+                    pricingTimesDetail.style.display = 'block';
+                    pricingAmountDetail.style.display = 'none';
+                }
             };
 
             const setReadonlyState = (isReadonly) => {
                 formContainer.classList.toggle('readonly', isReadonly);
                 editBtn.style.display = isReadonly ? 'inline-block' : 'none';
                 saveBtn.style.display = isReadonly ? 'none' : 'inline-block';
+                
+                Array.from(formContainer.querySelectorAll(
+                    'input:not([type="radio"]):not(.calculator-input), textarea'
+                )).forEach(el => {
+                     el.readOnly = isReadonly;
+                });
             };
             
             // --- 数据库操作 ---
             const addApi = (name) => {
-                const newApi = { name: name, url: '', keys: [''], imageDataUrl: null };
+                const newApi = { name, url: '', keys: [''], imageDataUrl: null, pricingType: 'times', pricingDetails: [{ name: '', cost: '' }], description: '' };
                 db.transaction(storeName, 'readwrite').objectStore(storeName).add(newApi).onsuccess = () => renderApiList();
             };
             const updateApi = () => {
-                const id = parseInt(apiIdInput.value);
+                const id = parseInt(apiIdInput.value); if (!id) return;
                 const imageDataUrl = apiImagePreview.src.startsWith('data:image') ? apiImagePreview.src : null;
                 const url = apiUrlInput.value.trim();
                 const keys = Array.from(keyList.querySelectorAll('input')).map(input => input.value.trim()).filter(key => key);
-                
-                const transaction = db.transaction(storeName, 'readwrite');
-                const objectStore = transaction.objectStore(storeName);
-                objectStore.get(id).onsuccess = (e) => {
+                const pricingType = document.querySelector('input[name="pricingType"]:checked').value;
+                let pricingDetails;
+                if (pricingType === 'amount') {
+                    pricingDetails = { input: inputPriceInput.value.trim(), output: outputPriceInput.value.trim() };
+                } else {
+                    pricingDetails = Array.from(modelList.querySelectorAll('.model-item')).map(item => ({
+                        name: item.children[0].value.trim(),
+                        cost: item.children[1].value.trim()
+                    })).filter(model => model.name || model.cost); 
+                }
+                const description = descriptionInput.value.trim();
+                db.transaction(storeName, 'readwrite').objectStore(storeName).get(id).onsuccess = (e) => {
                     const apiData = e.target.result;
-                    apiData.imageDataUrl = imageDataUrl;
-                    apiData.url = url;
-                    apiData.keys = keys.length > 0 ? keys : [''];
-                    
-                    objectStore.put(apiData).onsuccess = () => {
+                    Object.assign(apiData, { imageDataUrl, url, keys: keys.length > 0 ? keys : [''], pricingType, pricingDetails, description });
+                    db.transaction(storeName, 'readwrite').objectStore(storeName).put(apiData).onsuccess = () => {
                         setReadonlyState(true);
                         alert('保存成功');
                         renderApiList(); 
@@ -419,31 +622,21 @@
             };
 
             // --- 事件监听 ---
-            addApiBtn.addEventListener('click', () => {
-                const apiName = prompt('请输入新的 API 名称：');
-                if (apiName && apiName.trim()) addApi(apiName.trim());
-            });
+            addApiBtn.addEventListener('click', () => { const name = prompt('请输入新的 API 名称：'); if (name && name.trim()) addApi(name.trim()); });
             backBtn.addEventListener('click', showMainPage);
             editBtn.addEventListener('click', () => setReadonlyState(false));
             saveBtn.addEventListener('click', updateApi);
             addKeyBtn.addEventListener('click', () => addKeyInput());
-            
             apiUrlInput.addEventListener('click', () => copyOnClick(apiUrlInput));
-
-            apiImagePreview.addEventListener('click', () => {
-                if (!formContainer.classList.contains('readonly')) {
-                    apiImageInput.click();
-                }
-            });
-
+            apiImagePreview.addEventListener('click', () => { if (!formContainer.classList.contains('readonly')) apiImageInput.click(); });
             apiImageInput.addEventListener('change', (event) => {
                 const file = event.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => apiImagePreview.src = e.target.result;
-                    reader.readAsDataURL(file);
-                }
+                if (file) { const reader = new FileReader(); reader.onload = (e) => apiImagePreview.src = e.target.result; reader.readAsDataURL(file); }
             });
+            document.querySelectorAll('input[name="pricingType"]').forEach(radio => radio.addEventListener('change', togglePricingDetails));
+            addModelBtn.addEventListener('click', () => addModelInput());
+            [inputPriceInput, outputPriceInput, inputTokensInput, outputTokensInput].forEach(input => input.addEventListener('input', calculateCost));
+            [timesCalcInput1, timesCalcInput2].forEach(input => input.addEventListener('input', calculateTimes));
         });
     </script>
 </body>
