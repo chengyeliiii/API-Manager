@@ -45,6 +45,8 @@
             height: 100%;
             overflow-y: auto;
             box-sizing: border-box;
+            /* 平滑滚动行为 */
+            scroll-behavior: smooth;
         }
         
         #detailPage { display: none; }
@@ -217,7 +219,7 @@
 </head>
 <body>
 
-    <div class="container">
+    <div class="container" id="appContainer">
         <!-- 主页 -->
         <div id="mainPage">
             <div class="header"><h1>API Manager</h1></div>
@@ -315,7 +317,8 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- 元素获取 (主页和旧功能) ---
-            const mainPage = document.getElementById('mainPage'),
+            const appContainer = document.getElementById('appContainer'), // 获取最外层滚动容器
+                  mainPage = document.getElementById('mainPage'),
                   detailPage = document.getElementById('detailPage'),
                   addApiBtn = document.getElementById('addApiBtn'),
                   backBtn = document.getElementById('backBtn'),
@@ -353,6 +356,7 @@
             let db;
             const dbName = 'ApiManagerDB';
             const storeName = 'apis';
+            let mainScrollPosition = 0; // 新增：用于保存主页滚动位置
             
             // --- IndexedDB 初始化 ---
             const request = indexedDB.open(dbName, 2); 
@@ -365,17 +369,21 @@
                 }
             };
             
-            // --- 页面切换 ---
+            // --- 页面切换 (已更新) ---
             const showMainPage = () => {
                 mainPage.style.display = 'block';
                 detailPage.style.display = 'none';
                 addApiBtn.style.display = 'block';
                 renderApiList();
+                // 恢复滚动位置
+                appContainer.scrollTop = mainScrollPosition;
             };
             const showDetailPage = () => {
                 mainPage.style.display = 'none';
                 detailPage.style.display = 'block';
                 addApiBtn.style.display = 'none';
+                // 确保详情页从顶部开始显示
+                appContainer.scrollTop = 0;
             };
             
             // --- 渲染API列表 ---
@@ -408,9 +416,10 @@
                             const cancelPress = () => clearTimeout(pressTimer);
                             card.addEventListener('click', (event) => {
                                 if (isLongPress) {
-                                    event.preventDefault();
-                                    event.stopPropagation();
+                                    event.preventDefault(); event.stopPropagation();
                                 } else {
+                                    // 保存当前滚动位置 (已更新)
+                                    mainScrollPosition = appContainer.scrollTop;
                                     loadApiDetails(api.id);
                                 }
                             });
@@ -437,7 +446,6 @@
                         keyList.innerHTML = '';
                         modelList.innerHTML = '';
                         descriptionInput.value = '';
-                        // 清空计算器
                         inputPriceInput.value = ''; outputPriceInput.value = '';
                         inputTokensInput.value = ''; outputTokensInput.value = '';
                         timesCalcInput1.value = ''; timesCalcInput2.value = '';
@@ -449,7 +457,6 @@
                         apiImagePreview.src = api.imageDataUrl || DEFAULT_AVATAR;
                         apiUrlInput.value = api.url || '';
                         renderKeyList(api.keys || []);
-                        
                         descriptionInput.value = api.description || '';
                         const pricingType = api.pricingType || 'times'; 
                         
@@ -560,7 +567,6 @@
                     return;
                 }
                 const result = total / per;
-                // 如果是整数，显示整数，否则显示两位小数
                 timesCalcResult.textContent = result % 1 === 0 ? result : result.toFixed(2);
             };
 
@@ -578,12 +584,8 @@
                 formContainer.classList.toggle('readonly', isReadonly);
                 editBtn.style.display = isReadonly ? 'inline-block' : 'none';
                 saveBtn.style.display = isReadonly ? 'none' : 'inline-block';
-                
-                Array.from(formContainer.querySelectorAll(
-                    'input:not([type="radio"]):not(.calculator-input), textarea'
-                )).forEach(el => {
-                     el.readOnly = isReadonly;
-                });
+                Array.from(formContainer.querySelectorAll('input:not([type="radio"]):not(.calculator-input), textarea'))
+                     .forEach(el => { el.readOnly = isReadonly; });
             };
             
             // --- 数据库操作 ---
@@ -591,6 +593,7 @@
                 const newApi = { name, url: '', keys: [''], imageDataUrl: null, pricingType: 'times', pricingDetails: [{ name: '', cost: '' }], description: '' };
                 db.transaction(storeName, 'readwrite').objectStore(storeName).add(newApi).onsuccess = () => renderApiList();
             };
+
             const updateApi = () => {
                 const id = parseInt(apiIdInput.value); if (!id) return;
                 const imageDataUrl = apiImagePreview.src.startsWith('data:image') ? apiImagePreview.src : null;
